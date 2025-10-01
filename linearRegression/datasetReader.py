@@ -5,7 +5,7 @@ import random
 
 class MakeBatches():
     def Read(self):
-        parentDirectory = r"D:\Personal\ai\datasets\archive\trainingSet1\trainingSet"
+        parentDirectory = r"C:\Users\Ranjan\Personal\Mnist_Number_Identifier\datasets\archive\trainingSet1\trainingSet"
         batchSize=10
         folders = os.listdir(parentDirectory)
         fileStructure = {}

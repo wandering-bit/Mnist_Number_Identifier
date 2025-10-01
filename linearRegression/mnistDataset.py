@@ -3,6 +3,8 @@ import cv2
 import math
 import os
 from datasetReader import MakeBatches
+import time
+# import cupy as cp
 
 batches = MakeBatches()
 global_batch=batches.Read()
@@ -11,16 +13,23 @@ minRange = -1.0
 maxRange = 1.0
 
 inputs = None
+
 hiddenLayer1 = None
 hiddenLayer2 = None
+
 hiddenLayer1weight = None
 hiddenLayer2weight = None
+
 hiddenLyaer1bias = None
 hiddenLyaer2bias = None
+
 outpuLayerWeight = None
 outputLayerBias = None
+
 outputLayer = None
-learningRate = 0.001
+
+learningRate = 0.01
+
 OutputGradientWeight = None
 OutputGradientBias = None
 
@@ -31,15 +40,21 @@ Hidden2GradientWeight = None
 Hidden2GradientBias = None
 
 np.set_printoptions(suppress=True, precision=6)
+np.seterr(all="ignore")
 
 def feed_forward(data_inputs, epoch):
     global hiddenLayer1weight,hiddenLyaer1bias,hiddenLayer2weight,hiddenLyaer2bias,outpuLayerWeight,outputLayerBias
     global Hidden1GradientWeight,Hidden1GradientBias,Hidden2GradientWeight,Hidden2GradientBias,OutputGradientWeight,OutputGradientBias
+    total_batch_count=0
+    #this loop goes iterates over the whole data
     for epo in range(0,epoch):
         batchcount =0
-        print("running epoch ",epo," of ",epoch )
+        # print("\rRunning epoch ",epo," of ",epoch )
+        ## this loop iterates over the batches present in the whole data
         for batches in data_inputs:
-            print("remaining batches: ",len(data_inputs)-batchcount)
+            # print("remaining batches: ",len(data_inputs)-batchcount)
+            start_time = time.time()
+            ## this loop iterates over the images in the batch
             for input in batches:
                 imagePath,label = input[0],input[1]
                 # print("image path ",imagePath)
@@ -52,8 +67,15 @@ def feed_forward(data_inputs, epoch):
                 # print("output is ",outputLayer)
                 expected = formExpected(int(label))
                 BackPropagate(expected,outputLayer)
+            end_time = time.time()
+            time_taken = end_time-start_time
+            time_taken_minute = time_taken/60
             # print("1 batch processed")
             batchcount+=1
+            total_batch_count+=1
+            percentage = batchcount/len(data_inputs)*100
+            totalPercentage = total_batch_count/(len(data_inputs)*epoch)*100
+            print(f"\r|Epoch Completion: {percentage:.2f}% | Total Completion: {totalPercentage:.2f}% | Epoch: {epo} Of {epoch} | Total Time Remaining: {(time_taken_minute*((len(data_inputs)*epoch)-total_batch_count)):.2f} Minutes",end="",flush=True)
             hiddenLayer1weight=hiddenLayer1weight-Hidden1GradientWeight
             hiddenLyaer1bias=hiddenLyaer1bias-Hidden1GradientBias
 
@@ -69,6 +91,14 @@ def feed_forward(data_inputs, epoch):
             OutputGradientWeight=  np.full((10,900),0)
             OutputGradientBias=    np.full((10,1),0)
 
+            np.savez("model.npz",
+                hidden1weight=hiddenLayer1weight,
+                hidden1bias  =hiddenLyaer1bias,
+                hidden2weight=hiddenLayer2weight,
+                hidden2bias  =hiddenLyaer2bias,
+                outputweight =outpuLayerWeight,
+                outputbias   =outputLayerBias)
+
 def test(imagePath):
     image = cv2.imread(imagePath)
     grayImage = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
@@ -76,7 +106,7 @@ def test(imagePath):
     setHidden1()
     setHidden2()
     setOutput()
-    print("test output is ", outputLayer)
+    # print("test output is ", outputLayer)
 
 def BackPropagate(expected,outputLayer):
     global OutputGradientWeight,OutputGradientBias,Hidden2GradientWeight,Hidden2GradientBias,inputs,Hidden1GradientWeight,Hidden1GradientBias
@@ -161,12 +191,17 @@ def CalculateBiasGradient(errorArray):
 def CalculateError(expected,predicted):
     return expected-predicted
 
-def CalculateOutputError(target,output):
-    error =  output*(1-output)*(target-output)
+def CalculateOutputError(expected,predicted):
+    error = predicted-expected
     return error
 
 def sigmoid(x):
     return 1/(1 + np.exp(-x))
+
+def softMax(logits):
+    exp_values = np.exp(logits - np.max(logits))  # subtract max for numerical stability
+    probabilities = exp_values / np.sum(exp_values)
+    return probabilities
 
 def setInput(image):
     global inputs
@@ -193,8 +228,8 @@ def setOutput():
     global outpuLayerWeight,outputLayerBias,outputLayer
     # print("output layer", outputLayer)
     output_layer = np.dot(outpuLayerWeight,hiddenLayer2)+outputLayerBias
-    for i in range(0,len(output_layer)):
-        outputLayer[i][0]=sigmoid(output_layer[i])
+    # for i in range(0,len(output_layer)):
+    outputLayer=softMax(output_layer)
 
 def initializeInput():
     global inputs
@@ -229,6 +264,7 @@ def main():
     initializeHidden1()
     initializeHidden2()
     initializeOuputLayer()
-    feed_forward(global_batch,1)
-    test(r"D:\Personal\ai\datasets\archive\testSet\testSet\img_15.jpg")
+    feed_forward(global_batch,5)
+    test(r"C:\Users\Ranjan\Personal\Mnist_Number_Identifier\datasets\archive\testSet\testSet\img_10.jpg")
+
 main()
